@@ -1,72 +1,47 @@
-name: Build and Deploy Qiyas Materials
+name: Build Qiyas APK
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: github-pages
-  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare Website
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Check Android project
         run: |
-          set -e
-          mkdir -p dist
-
-          if [ -f "index.html" ]; then
-            cp index.html dist/index.html
-          else
-            ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
-
-            if [ -z "$ZIP_FILE" ]; then
-              echo "ERROR: No index.html or ZIP file found"
-              exit 1
-            fi
-
-            mkdir extracted
-            unzip -o "$ZIP_FILE" -d extracted
-
-            FILE=$(find extracted -type f -name "index.html" | head -n 1)
-
-            if [ -z "$FILE" ]; then
-              echo "ERROR: index.html not found inside ZIP"
-              exit 1
-            fi
-
-            cp "$FILE" dist/index.html
+          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
+            echo "Android project not found in app/"
+            echo "A website index.html alone cannot be built into an APK."
+            exit 1
           fi
 
-          touch dist/.nojekyll
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-      - name: Upload Website
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy Website
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: Qiyas-APK
+          path: app/build/outputs/apk/debug/*.apk
