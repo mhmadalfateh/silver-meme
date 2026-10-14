@@ -23,28 +23,34 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Extract ZIP
+      - name: Prepare Website
         run: |
           set -e
-          mkdir -p dist extracted
+          mkdir -p dist
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+          if [ -f "index.html" ]; then
+            cp index.html dist/index.html
+          else
+            ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP file not found in repository root"
-            exit 1
+            if [ -z "$ZIP_FILE" ]; then
+              echo "ERROR: No index.html or ZIP file found"
+              exit 1
+            fi
+
+            mkdir extracted
+            unzip -o "$ZIP_FILE" -d extracted
+
+            FILE=$(find extracted -type f -name "index.html" | head -n 1)
+
+            if [ -z "$FILE" ]; then
+              echo "ERROR: index.html not found inside ZIP"
+              exit 1
+            fi
+
+            cp "$FILE" dist/index.html
           fi
 
-          unzip -o "$ZIP_FILE" -d extracted
-
-          FILE=$(find extracted -type f -name "index.html" | head -n 1)
-
-          if [ -z "$FILE" ]; then
-            echo "ERROR: index.html not found inside ZIP"
-            exit 1
-          fi
-
-          cp "$FILE" dist/index.html
           touch dist/.nojekyll
 
       - name: Upload Website
